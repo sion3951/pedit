@@ -104,6 +104,11 @@ def tensor_to_numpy(tensor, bit_depth=16):
     
     return image
 
+@app.route('/')
+def index():
+    """Serve the main application page"""
+    return send_file('static/index.html')
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     return jsonify({
