@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPU Photo Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 320px;
+            background: #242424;
+            border-right: 1px solid #333;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            padding: 20px;
+            background: #2a2a2a;
+            border-bottom: 1px solid #333;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status {
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status.cuda {
+            color: #76ff03;
+        }
+
+        .upload-section {
+            padding: 20px;
+            border-bottom: 1px solid #333;
+        }
+
+        .upload-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .upload-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .controls {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .control-group {
+            margin-bottom: 25px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #667eea;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #667eea;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        .value-display {
+            min-width: 45px;
+            text-align: right;
+            font-size: 13px;
+            color: #999;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .btn {
+            padding: 8px 12px;
+            background: #333;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: #e0e0e0;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: #3a3a3a;
+            border-color: #555;
+        }
+
+        .btn.active {
+            background: #667eea;
+            border-color: #667eea;
+        }
+
+        .export-section {
+            padding: 20px;
+            border-top: 1px solid #333;
+            background: #2a2a2a;
+        }
+
+        .export-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .format-btn {
+            padding: 10px;
+            background: #333;
+            border: 2px solid #444;
+            border-radius: 6px;
+            color: #e0e0e0;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+
+        .format-btn:hover {
+            border-color: #555;
+        }
+
+        .format-btn.selected {
+            background: #667eea;
+            border-color: #667eea;
+        }
+
+        .export-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .export-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .export-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #1a1a1a;
+        }
+
+        .toolbar {
+            padding: 15px 20px;
+            background: #242424;
+            border-bottom: 1px solid #333;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .canvas-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .canvas-wrapper {
+            max-width: 100%;
+            max-height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #preview {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 4px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .spinner {
+            border: 3px solid #333;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .file-info {
+            padding: 15px 20px;
+            background: #242424;
+            border-top: 1px solid #333;
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .placeholder {
+            text-align: center;
+            color: #666;
+        }
+
+        .placeholder h2 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .placeholder p {
+            font-size: 14px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            color: #e0e0e0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast.success {
+            border-color: #38ef7d;
+        }
+
+        .toast.error {
+            border-color: #ff5252;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="header">
+                <h1>GPU Photo Editor</h1>
+                <div class="status" id="status">Checking GPU...</div>
+            </div>
+
+            <div class="upload-section">
+                <input type="file" id="fileInput" accept="image/*,.cr2,.cr3,.nef,.arw,.dng,.raf,.orf,.rw2,.heic">
+                <button class="upload-btn" id="uploadBtn">Upload Photo</button>
+            </div>
+
+            <div class="controls">
+                <div class="control-group">
+                    <label>Exposure</label>
+                    <div class="slider-container">
+                        <input type="range" id="exposure" min="-2" max="2" step="0.1" value="0">
+                        <span class="value-display" id="exposureValue">0.0</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Brightness</label>
+                    <div class="slider-container">
+                        <input type="range" id="brightness" min="0.3" max="2" step="0.05" value="1">
+                        <span class="value-display" id="brightnessValue">1.0</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Contrast</label>
+                    <div class="slider-container">
+                        <input type="range" id="contrast" min="0.3" max="2" step="0.05" value="1">
+                        <span class="value-display" id="contrastValue">1.0</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Saturation</label>
+                    <div class="slider-container">
+                        <input type="range" id="saturation" min="0" max="2" step="0.05" value="1">
+                        <span class="value-display" id="saturationValue">1.0</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Highlights</label>
+                    <div class="slider-container">
+                        <input type="range" id="highlights" min="-1" max="1" step="0.05" value="0">
+                        <span class="value-display" id="highlightsValue">0.0</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Shadows</label>
+                    <div class="slider-container">
+                        <input type="range" id="shadows" min="-1" max="1" step="0.05" value="0">
+                        <span class="value-display" id="shadowsValue">0.0</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Temperature</label>
+                    <div class="slider-container">
+                        <input type="range" id="temperature" min="-1" max="1" step="0.05" value="0">
+                        <span class="value-display" id="temperatureValue">0.0</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Tint</label>
+                    <div class="slider-container">
+                        <input type="range" id="tint" min="-1" max="1" step="0.05" value="0">
+                        <span class="value-display" id="tintValue">0.0</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Sharpen</label>
+                    <div class="slider-container">
+                        <input type="range" id="sharpen" min="0" max="2" step="0.1" value="0">
+                        <span class="value-display" id="sharpenValue">0.0</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Blur</label>
+                    <div class="slider-container">
+                        <input type="range" id="blur" min="0" max="20" step="1" value="0">
+                        <span class="value-display" id="blurValue">0</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Transform</label>
+                    <div class="button-group">
+                        <button class="btn" id="flipH">Flip H</button>
+                        <button class="btn" id="flipV">Flip V</button>
+                        <button class="btn" id="rotate90">Rotate 90°</button>
+                        <button class="btn" id="rotate180">Rotate 180°</button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <button class="btn" id="resetBtn" style="width: 100%">Reset All</button>
+                </div>
+            </div>
+
+            <div class="export-section">
+                <label style="display: block; margin-bottom: 10px; font-size: 13px; color: #aaa;">Export Format</label>
+                <div class="export-options">
+                    <button class="format-btn selected" data-format="jpeg">JPEG</button>
+                    <button class="format-btn" data-format="png">PNG</button>
+                    <button class="format-btn" data-format="avif">AVIF</button>
+                    <button class="format-btn" data-format="exr">OpenEXR</button>
+                    <button class="format-btn" data-format="tiff">TIFF</button>
+                </div>
+                <button class="export-btn" id="exportBtn" disabled>Export Image</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="toolbar">
+                <div class="action-buttons">
+                    <button class="btn" id="processBtn" disabled>Apply Changes</button>
+                    <button class="btn" id="previewBtn" disabled>Update Preview</button>
+                </div>
+            </div>
+
+            <div class="canvas-container">
+                <div class="canvas-wrapper" id="canvasWrapper">
+                    <div class="placeholder" id="placeholder">
+                        <h2>GPU Photo Editor</h2>
+                        <p>Upload a photo to get started</p>
+                        <p style="margin-top: 10px; font-size: 12px;">Supports RAW, JPEG, PNG, HEIC and more</p>
+                    </div>
+                    <img id="preview" style="display: none;">
+                </div>
+                <div class="loading" id="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <div>Processing...</div>
+                </div>
+            </div>
+
+            <div class="file-info" id="fileInfo" style="display: none;">
+                <span id="fileDetails"></span>
+                <span id="processingTime"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+        
+        let currentFileId = null;
+        let currentOutputId = null;
+        let selectedFormat = 'jpeg';
+        let operations = [];
+
+        // Check GPU status
+        async function checkHealth() {
+            try {
+                const response = await fetch(`${API_URL}/api/health`);
+                const data = await response.json();
+                
+                const statusEl = document.getElementById('status');
+                if (data.cuda_available) {
+                    statusEl.innerHTML = `<span style="color: #76ff03;">●</span> GPU: ${data.gpu_name}`;
+                    statusEl.className = 'status cuda';
+                } else {
+                    statusEl.innerHTML = `<span style="color: #ff5252;">●</span> CPU Mode (No GPU)`;
+                    statusEl.className = 'status';
+                }
+            } catch (error) {
+                console.error('Health check failed:', error);
+            }
+        }
+
+        // File upload
+        document.getElementById('uploadBtn').addEventListener('click', () => {
+            document.getElementById('fileInput').click();
+        });
+
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            showLoading(true);
+            
+            try {
+                const response = await fetch(`${API_URL}/api/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Upload failed');
+                }
+
+                const data = await response.json();
+                currentFileId = data.file_id;
+                currentOutputId = null;
+                
+                document.getElementById('fileDetails').textContent = 
+                    `${data.filename} • ${data.width}×${data.height} • ${data.is_raw ? 'RAW' : 'Standard'}`;
+                document.getElementById('fileInfo').style.display = 'flex';
+                
+                document.getElementById('processBtn').disabled = false;
+                document.getElementById('previewBtn').disabled = false;
+                
+                resetControls();
+                showToast('File uploaded successfully', 'success');
+            } catch (error) {
+                showToast('Upload failed: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        });
+
+        // Controls
+        const controls = ['exposure', 'brightness', 'contrast', 'saturation', 'highlights', 
+                         'shadows', 'temperature', 'tint', 'sharpen', 'blur'];
+        
+        controls.forEach(control => {
+            const slider = document.getElementById(control);
+            const display = document.getElementById(control + 'Value');
+            
+            slider.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                display.textContent = value.toFixed(control === 'blur' ? 0 : 1);
+            });
+        });
+
+        function getOperations() {
+            const ops = [];
+            
+            controls.forEach(control => {
+                const value = parseFloat(document.getElementById(control).value);
+                const defaultVal = control === 'brightness' || control === 'contrast' || control === 'saturation' ? 1 : 0;
+                
+                if (value !== defaultVal) {
+                    ops.push({ type: control, value: value });
+                }
+            });
+            
+            return ops;
+        }
+
+        // Transform buttons
+        document.getElementById('flipH').addEventListener('click', () => {
+            operations.push({ type: 'flip', value: 'horizontal' });
+            processImage();
+        });
+
+        document.getElementById('flipV').addEventListener('click', () => {
+            operations.push({ type: 'flip', value: 'vertical' });
+            processImage();
+        });
+
+        document.getElementById('rotate90').addEventListener('click', () => {
+            operations.push({ type: 'rotate', value: 90 });
+            processImage();
+        });
+
+        document.getElementById('rotate180').addEventListener('click', () => {
+            operations.push({ type: 'rotate', value: 180 });
+            processImage();
+        });
+
+        // Reset
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            resetControls();
+            operations = [];
+            if (currentFileId) {
+                processImage();
+            }
+        });
+
+        function resetControls() {
+            document.getElementById('exposure').value = 0;
+            document.getElementById('exposureValue').textContent = '0.0';
+            document.getElementById('brightness').value = 1;
+            document.getElementById('brightnessValue').textContent = '1.0';
+            document.getElementById('contrast').value = 1;
+            document.getElementById('contrastValue').textContent = '1.0';
+            document.getElementById('saturation').value = 1;
+            document.getElementById('saturationValue').textContent = '1.0';
+            document.getElementById('highlights').value = 0;
+            document.getElementById('highlightsValue').textContent = '0.0';
+            document.getElementById('shadows').value = 0;
+            document.getElementById('shadowsValue').textContent = '0.0';
+            document.getElementById('temperature').value = 0;
+            document.getElementById('temperatureValue').textContent = '0.0';
+            document.getElementById('tint').value = 0;
+            document.getElementById('tintValue').textContent = '0.0';
+            document.getElementById('sharpen').value = 0;
+            document.getElementById('sharpenValue').textContent = '0.0';
+            document.getElementById('blur').value = 0;
+            document.getElementById('blurValue').textContent = '0';
+        }
+
+        // Process image
+        document.getElementById('processBtn').addEventListener('click', processImage);
+
+        async function processImage() {
+            if (!currentFileId) return;
+
+            showLoading(true);
+            const startTime = Date.now();
+
+            try {
+                const allOps = [...operations, ...getOperations()];
+                
+                const response = await fetch(`${API_URL}/api/process`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        file_id: currentFileId,
+                        operations: allOps,
+                        high_quality: true
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Processing failed');
+                }
+
+                const data = await response.json();
+                currentOutputId = data.output_id;
+                
+                const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
+                document.getElementById('processingTime').textContent = `Processed in ${processingTime}s`;
+                
+                // Get preview
+                await updatePreview();
+                
+                document.getElementById('exportBtn').disabled = false;
+                showToast('Image processed successfully', 'success');
+            } catch (error) {
+                showToast('Processing failed: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Preview
+        document.getElementById('previewBtn').addEventListener('click', updatePreview);
+
+        async function updatePreview() {
+            if (!currentOutputId) return;
+
+            try {
+                const response = await fetch(`${API_URL}/api/preview`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        output_id: currentOutputId,
+                        max_size: 1600
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Preview failed');
+                }
+
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                
+                const preview = document.getElementById('preview');
+                preview.src = url;
+                preview.style.display = 'block';
+                document.getElementById('placeholder').style.display = 'none';
+            } catch (error) {
+                showToast('Preview failed: ' + error.message, 'error');
+            }
+        }
+
+        // Format selection
+        document.querySelectorAll('.format-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('selected'));
+                e.target.classList.add('selected');
+                selectedFormat = e.target.dataset.format;
+            });
+        });
+
+        // Export
+        document.getElementById('exportBtn').addEventListener('click', async () => {
+            if (!currentOutputId) return;
+
+            showLoading(true);
+
+            try {
+                const response = await fetch(`${API_URL}/api/export`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        output_id: currentOutputId,
+                        format: selectedFormat,
+                        quality: 95
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Export failed');
+                }
+
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `edited.${selectedFormat}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showToast('Image exported successfully', 'success');
+            } catch (error) {
+                showToast('Export failed: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        });
+
+        // Helpers
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // Initialize
+        checkHealth();
+    </script>
+</body>
+</html>
