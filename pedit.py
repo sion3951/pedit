@@ -393,15 +393,16 @@ def get_preview():
             new_height = int(height * scale)
             image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_AREA)
         
-        # Convert to JPEG for preview
+        # Save preview to temp file
+        preview_path = os.path.join(app.config['PROCESSED_FOLDER'], f"{output_id}_preview.jpg")
         img = Image.fromarray(image)
-        img_io = io.BytesIO()
-        img.save(img_io, 'JPEG', quality=90)
-        img_io.seek(0)
+        img.save(preview_path, 'JPEG', quality=90)
         
-        return send_file(img_io, mimetype='image/jpeg')
+        return send_file(preview_path, mimetype='image/jpeg')
     
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'Preview generation failed: {str(e)}'}), 500
 
 if __name__ == '__main__':
